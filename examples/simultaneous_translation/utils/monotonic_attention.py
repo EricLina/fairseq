@@ -86,8 +86,7 @@ def expected_soft_attention(
     if padding_mask is not None:
         alpha = alpha.masked_fill(padding_mask.unsqueeze(1), 0.0)
         soft_energy = soft_energy.masked_fill(
-            padding_mask.unsqueeze(1),
-            -1e4 if soft_energy.dtype == torch.float16 else -1e8
+            padding_mask.unsqueeze(1), -float("inf")
         )
 
     prob_check(alpha)
@@ -173,7 +172,8 @@ def mass_preservation(
         src_lens = src_len - padding_mask.sum(dim=1, keepdim=True)
         src_lens = src_lens.expand(-1, tgt_len).contiguous()
         # add back the last value
-        alpha = alpha.scatter_add(2, src_lens.unsqueeze(2) - 1, residuals)
+        residuals += alpha.gather(2, src_lens.unsqueeze(2) - 1)
+        alpha = alpha.scatter(2, src_lens.unsqueeze(2) - 1, residuals)
 
         prob_check(alpha)
 
